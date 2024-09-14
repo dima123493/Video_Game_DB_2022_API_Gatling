@@ -1,80 +1,89 @@
 package videogamedb;
 
 import io.gatling.javaapi.core.ChainBuilder;
-import io.gatling.javaapi.core.FeederBuilder;
 import io.gatling.javaapi.core.Simulation;
 import io.gatling.javaapi.core.ScenarioBuilder;
 import io.gatling.javaapi.http.HttpProtocolBuilder;
+import lombok.extern.slf4j.Slf4j;
 
 import static io.gatling.javaapi.core.CoreDsl.*;
 import static io.gatling.javaapi.core.OpenInjectionStep.atOnceUsers;
 import static io.gatling.javaapi.http.HttpDsl.http;
+import static io.gatling.javaapi.http.internal.HttpCheckBuilders.status;
 
+@Slf4j
 public class VideoGameDbSimulation extends Simulation {
-
-    private HttpProtocolBuilder httpProtocol = http
-            .baseUrl("https://videogamedb.uk/api")
-            .acceptHeader("application/json")
-            .contentTypeHeader("application/json");
-
-    private static final int USER_COUNT = Integer.parseInt(System.getProperty("USERS", "5"));
-    private static final int RAMP_DURATION = Integer.parseInt(System.getProperty("RAMP_DURATION", "10"));
-
-    private static FeederBuilder.FileBased<Object> jsonFeeder = jsonFile("data/gameJsonFile.json").random();
-
     @Override
-    public void before(){
-        System.out.printf("Running tests with %d users%n",USER_COUNT);
-        System.out.printf("Ramping users over %d seconds%n",RAMP_DURATION);
+    public void before() {
+        log.info("Running tests with {} users", Configuration.USER_COUNT);
+        log.info("Ramping users over {} seconds", Configuration.RAMP_DURATION);
     }
 
-    private static ChainBuilder getAllGames = exec(http("Get all games")
-            .get("/videogame"));
+    private HttpProtocolBuilder httpProtocol() {
+        return http.baseUrl("https://videogamedb.uk/api")
+                .acceptHeader("application/json")
+                .contentTypeHeader("application/json");
+    }
 
-    private static ChainBuilder authenticate = exec(http("Authenticate")
-            .post("/authenticate")
-            .body(StringBody("""
-                    {
-                      "password": "admin",
-                      "username": "admin"
-                    }
-                    """))
-            .check(jmesPath("token").saveAs("jwtTocken")));
+    private ChainBuilder getAllGames() {
+        return exec(http("Get all games")
+                .get("/videogame"));
+    }
 
-    private static ChainBuilder createNewGame = feed(jsonFeeder)
-            .exec(http("Create a new game - #{name}")
-            .post("/videogame")
-            .header("Authorization", "Bearer #{jwtTocken}")
-            .body(ElFileBody("bodies/newGameTemplate.json")).asJson());
+    private ChainBuilder authenticate() {
+        return exec(http("Authenticate")
+                .post("/authenticate")
+                .body(StringBody("""
+                        {
+                          "password": "admin",
+                          "username": "admin"
+                        }
+                        """))
+                .check(status().is(200))
+                .check(jmesPath("token").saveAs("jwtToken")));
+    }
 
-    private static ChainBuilder getLastPostedGame = exec(http("Get last posted game - #{name}")
-            .get("/videogame/#{id}")
-            .check(jmesPath("name").isEL("#{name}")));
+    private ChainBuilder createNewGame() {
+        return feed(Configuration.jsonFeeder)
+                .exec(http("Create a new game - #{name}")
+                        .post("/videogame")
+                        .header("Authorization", "Bearer #{jwtToken}")
+                        .body(ElFileBody("bodies/newGameTemplate.json")).asJson());
+    }
 
-    private static ChainBuilder deleteLastPostedGame = exec(http("Delete last posted game - #{name}")
-            .delete("/videogame/#{id}")
-            .header("Authorization", "Bearer #{jwtTocken}")
-            .check(bodyString().is("Video game deleted")));
+    private ChainBuilder getLastPostedGame(){
+       return exec(http("Get last posted game - #{name}")
+                .get("/videogame/#{id}")
+                .check(jmesPath("name").isEL("#{name}")));
+    }
 
-    private ScenarioBuilder scenarioBuilder = scenario("Video Game DB Stress Test")
-            .exec(getAllGames)
+    private ChainBuilder deleteLastPostedGame(){
+       return exec(http("Delete last posted game - #{name}")
+                .delete("/videogame/#{id}")
+                .header("Authorization", "Bearer #{jwtToken}")
+                .check(bodyString().is("Video game deleted")));
+    }
+
+    private final ScenarioBuilder scenarioBuilder = scenario("Video Game DB Stress Test")
+            .exec(getAllGames())
             .pace(2)
-            .exec(authenticate)
+            .exec(authenticate())
             .pace(2)
-            .exec(createNewGame)
+            .exec(createNewGame())
             .pace(2)
-            .exec(getLastPostedGame)
+            .exec(getLastPostedGame())
             .pace(2)
-            .exec(deleteLastPostedGame);
+            .exec(deleteLastPostedGame());
 
-    private ScenarioBuilder scenarioGetAllGames = scenario("Video Game DB Stress Test")
-            .exec(http("Get all games")
-                    .get("/videogame"));
+    private ScenarioBuilder scenarioGetAllGames(){
+       return scenario("Video Game DB Get All Games Test")
+                .exec(getAllGames());
+    }
 
     {
-        //setUp(scenarioGetAllGames.injectOpen(atOnceUsers(1))).protocols(httpProtocol);
-        //setUp(scenarioBuilder.injectOpen(atOnceUsers(1))).protocols(httpProtocol);
-        setUp(scenarioBuilder.injectOpen(nothingFor(5),rampUsers(USER_COUNT).during(RAMP_DURATION))).protocols(httpProtocol);
+        setUp(scenarioGetAllGames().injectOpen(atOnceUsers(1)),
+                scenarioBuilder.injectOpen(nothingFor(5), rampUsers(Configuration.USER_COUNT).during(Configuration.RAMP_DURATION)))
+                .protocols(httpProtocol());
     }
 
 }
