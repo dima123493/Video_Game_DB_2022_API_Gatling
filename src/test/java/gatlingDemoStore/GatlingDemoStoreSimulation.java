@@ -16,9 +16,8 @@ import static io.gatling.javaapi.http.HttpDsl.*;
 
 @Slf4j
 public class GatlingDemoStoreSimulation extends Simulation {
-    private static int USER_COUNT = Integer.parseInt(System.getProperty("USERS", "5"));
-    private static Duration RAMP_DURATION = Duration.ofSeconds(Integer.parseInt(System.getProperty("RAMP_DURATION", "10")));
-    private static Duration TEST_DURATION = Duration.ofSeconds(Integer.parseInt(System.getProperty("TEST_DURATION", "60")));
+    private static final int USER_COUNT = Integer.parseInt(System.getProperty("USERS", "5"));
+    private static final Duration RAMP_DURATION = Duration.ofSeconds(Integer.parseInt(System.getProperty("RAMP_DURATION", "10")));
     private static final String DOMAIN = "demostore.gatling.io";
     private static final HttpProtocolBuilder HTTP_PROTOCOL = http.baseUrl("https://" + DOMAIN);
 
