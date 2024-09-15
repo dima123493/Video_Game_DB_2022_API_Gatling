@@ -1,5 +1,9 @@
 package gatlingDemoStore;
 
+import gatlingDemoStore.pageObjects.Catalog;
+import gatlingDemoStore.pageObjects.Checkout;
+import gatlingDemoStore.pageObjects.CmsPages;
+import gatlingDemoStore.pageObjects.Customer;
 import io.gatling.javaapi.core.*;
 import io.gatling.javaapi.http.HttpProtocolBuilder;
 import lombok.extern.slf4j.Slf4j;
@@ -8,7 +12,6 @@ import java.time.Duration;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static io.gatling.javaapi.core.CoreDsl.*;
-import static io.gatling.javaapi.core.OpenInjectionStep.atOnceUsers;
 import static io.gatling.javaapi.http.HttpDsl.*;
 
 @Slf4j
@@ -18,84 +21,6 @@ public class GatlingDemoStoreSimulation extends Simulation {
     private static Duration TEST_DURATION = Duration.ofSeconds(Integer.parseInt(System.getProperty("TEST_DURATION", "60")));
     private static final String DOMAIN = "demostore.gatling.io";
     private static final HttpProtocolBuilder HTTP_PROTOCOL = http.baseUrl("https://" + DOMAIN);
-    private static final FeederBuilder.FileBased<String> categoryFeeder = csv("data/categoryDetails.csv").random();
-    public static final FeederBuilder.FileBased<Object> jsonFeeder = jsonFile("data/productDetails.json").random();
-    private static final FeederBuilder.FileBased<String> loginFeeder = csv("data/loginDetails.csv").circular();
-
-    private static class Catalog {
-        private static class Category {
-            private static ChainBuilder view() {
-                return feed(categoryFeeder)
-                        .exec(http("Load Category Page #{categoryName}")
-                                .get("/category/#{categorySlug}")
-                                .check(css("#CategoryName").isEL("#{categoryName}")));
-            }
-        }
-
-        private static class Product {
-            private static ChainBuilder view() {
-                return feed(jsonFeeder)
-                        .exec(http("Load Product Page #{name}")
-                                .get("/product/#{slug}")
-                                .check(css("#ProductDescription").isEL("#{description}")));
-            }
-
-            private static ChainBuilder add() {
-                return exec(view())
-                        .exec(http("Add Product to Cart")
-                                .get("/cart/add/#{id}")
-                                .check(substring("items in your cart")))
-                        .exec(session -> {
-                            double currentCartTotal = session.getDouble("cartTotal");
-                            double itemPrice = session.getDouble("price");
-                            return session.set("cartTotal", (currentCartTotal + itemPrice));
-                        });
-            }
-        }
-    }
-
-    private static class Customer {
-        private static ChainBuilder loadLogin() {
-            return feed(loginFeeder)
-                    .exec(http("Login Page Load")
-                            .get("/login")
-                            .check(substring("Username:")));
-
-        }
-
-        private static ChainBuilder login() {
-
-            return exec(http("Login")
-                    .post("/login")
-                    .formParam("_csrf", "#{csrfValue}")
-                    .formParam("username", "#{username}")
-                    .formParam("password", "#{password}"))
-
-                    .exec(session -> session.set("customerLoggedIn", true));
-                    /*.exec(session -> {
-                        log.info("Customer is LoggedIn " + session.get("customerLoggedIn"));
-                        return session;
-                    });*/
-        }
-
-    }
-
-    private static class Checkout {
-        private static ChainBuilder viewCart() {
-            return doIf(session -> !session.getBoolean("customerLoggedIn"))
-                    .then(exec(Customer.loadLogin())
-                            .exec(Customer.login()))
-                    .exec(http("Load Cart Page")
-                            .get("/cart/view")
-                            .check(css("#grandTotal").isEL("$#{cartTotal}")));
-        }
-
-        private static ChainBuilder completeCheckout() {
-            return exec(http("Checkout")
-                    .get("/cart/checkout")
-                    .check(substring("Thanks for your order! See you soon!")));
-        }
-    }
 
     private static ChainBuilder initSession() {
         return exec(flushCookieJar())
@@ -104,18 +29,6 @@ public class GatlingDemoStoreSimulation extends Simulation {
                 .exec(session -> session.set("cartTotal", 0.00))
                 .exec(addCookie(Cookie("sessionId", SessionIdGenerator.random())
                         .withDomain(DOMAIN)));
-    }
-
-    private static ChainBuilder getSessionId() {
-        return exec(http("Get csrf value")
-                .get("/")
-                .check(regex("<title>Gatling Demo-Store</title>").exists())
-                .check(css("#_csrf", "content").saveAs("csrefValue")));
-    }
-
-    private static ChainBuilder goToAboutUs() {
-        return exec(http("Visit About Us page")
-                .get("/about-us"));
     }
 
     private static ChainBuilder goToAllProducts() {
@@ -138,14 +51,6 @@ public class GatlingDemoStoreSimulation extends Simulation {
                 .get("/cart/view"));
     }
 
-    private static ChainBuilder login() {
-        return exec(http("Login")
-                .post("/login")
-                .formParam("_csrf", "#{csrfValue}")
-                .formParam("username", "user1")
-                .formParam("password", "pass"));
-    }
-
     private static ChainBuilder checkout() {
         return exec(http("Checkout")
                 .get("/cart/checkout"));
@@ -154,7 +59,7 @@ public class GatlingDemoStoreSimulation extends Simulation {
     private static final ScenarioBuilder scenarioBuilder = scenario("Video Game DB Stress Test")
             .exec(initSession())
             .pace(2)
-            .exec(goToAboutUs())
+            .exec(CmsPages.aboutUsPage())
             .pace(2)
             .exec(Catalog.Category.view())
             .pace(2)
@@ -170,9 +75,9 @@ public class GatlingDemoStoreSimulation extends Simulation {
 
         private static ChainBuilder browsStore() {
             return exec(initSession())
-                    .exec(login())
+                    .exec(Customer.login())
                     .pause(MAX_PAUSE)
-                    .exec(goToAboutUs())
+                    .exec(CmsPages.aboutUsPage())
                     .pause(MIN_PAUSE, MAX_PAUSE)
                     .repeat(5)
                     .on(exec(Catalog.Category.view())
@@ -183,7 +88,7 @@ public class GatlingDemoStoreSimulation extends Simulation {
 
         private static ChainBuilder abandonCart() {
             return exec(initSession())
-                    .exec(login())
+                    .exec(Customer.login())
                     .pause(MAX_PAUSE)
                     .exec(Catalog.Category.view())
                     .pause(MIN_PAUSE, MAX_PAUSE)
@@ -194,7 +99,7 @@ public class GatlingDemoStoreSimulation extends Simulation {
 
         private static ChainBuilder completePurchase() {
             return exec(initSession())
-                    .exec(login())
+                    .exec(Customer.login())
                     .pause(MAX_PAUSE)
                     .exec(Catalog.Category.view())
                     .pause(MIN_PAUSE, MAX_PAUSE)
