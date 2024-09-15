@@ -51,14 +51,14 @@ public class VideoGameDbSimulation extends Simulation {
                         .body(ElFileBody("bodies/newGameTemplate.json")).asJson());
     }
 
-    private ChainBuilder getLastPostedGame(){
-       return exec(http("Get last posted game - #{name}")
+    private ChainBuilder getLastPostedGame() {
+        return exec(http("Get last posted game - #{name}")
                 .get("/videogame/#{id}")
                 .check(jmesPath("name").isEL("#{name}")));
     }
 
-    private ChainBuilder deleteLastPostedGame(){
-       return exec(http("Delete last posted game - #{name}")
+    private ChainBuilder deleteLastPostedGame() {
+        return exec(http("Delete last posted game - #{name}")
                 .delete("/videogame/#{id}")
                 .header("Authorization", "Bearer #{jwtToken}")
                 .check(bodyString().is("Video game deleted")));
@@ -75,14 +75,19 @@ public class VideoGameDbSimulation extends Simulation {
             .pace(2)
             .exec(deleteLastPostedGame());
 
-    private ScenarioBuilder scenarioGetAllGames(){
-       return scenario("Video Game DB Get All Games Test")
+    private ScenarioBuilder scenarioGetAllGames() {
+        return scenario("Video Game DB Get All Games Test")
                 .exec(getAllGames());
     }
 
     {
         setUp(scenarioGetAllGames().injectOpen(atOnceUsers(1)),
-                scenarioBuilder.injectOpen(nothingFor(5), rampUsers(Configuration.USER_COUNT).during(Configuration.RAMP_DURATION)))
+                scenarioBuilder.injectOpen(
+                        nothingFor(5),
+                        atOnceUsers(1),
+                        rampUsers(Configuration.USER_COUNT).during(Configuration.RAMP_DURATION),
+                        constantUsersPerSec(2).during(20)
+                ))
                 .protocols(httpProtocol());
     }
 
