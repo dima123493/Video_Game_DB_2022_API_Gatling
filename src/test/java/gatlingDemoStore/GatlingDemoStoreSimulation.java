@@ -247,8 +247,14 @@ public class GatlingDemoStoreSimulation extends Simulation {
                 .maxDuration(Duration.ofMinutes(3));*/
 
         //scenario tests
-        setUp(Scenarios.defaultPurchase.injectOpen(
+        /*setUp(Scenarios.defaultPurchase.injectOpen(
                 rampUsers(USER_COUNT).during(RAMP_DURATION)
-        )).protocols(HTTP_PROTOCOL);
+        )).protocols(HTTP_PROTOCOL);*/
+
+        //sequential scenario run
+        setUp(Scenarios.defaultPurchase
+                .injectOpen(rampUsers(USER_COUNT).during(RAMP_DURATION)).protocols(HTTP_PROTOCOL)
+                .andThen(Scenarios.highPurchase
+                        .injectOpen(rampUsers(USER_COUNT).during(RAMP_DURATION)).protocols(HTTP_PROTOCOL)));
     }
 }
