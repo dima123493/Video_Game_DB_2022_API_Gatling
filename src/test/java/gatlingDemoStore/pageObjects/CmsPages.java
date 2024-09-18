@@ -11,7 +11,12 @@ public final class CmsPages {
         return exec(http("Get csrf value")
                 .get("/")
                 .check(regex("<title>Gatling Demo-Store</title>").exists())
-                .check(css("#_csrf", "content").saveAs("csrefValue")));
+                .check(css("#_csrf", "content").saveAs("csrfValue")));
+                /*.exec(session -> {
+                    String csrfValue = session.getString("csrfValue");
+                    System.out.println("Extracted CSRF Value: " + csrfValue);
+                    return session;
+                });*/
     }
 
     public static ChainBuilder aboutUsPage() {

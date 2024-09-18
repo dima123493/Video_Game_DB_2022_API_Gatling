@@ -58,6 +58,8 @@ public class GatlingDemoStoreSimulation extends Simulation {
     private static final ScenarioBuilder scenarioBuilder = scenario("Video Game DB Stress Test")
             .exec(initSession())
             .pace(2)
+            .exec(CmsPages.homePage())
+            .pace(2)
             .exec(CmsPages.aboutUsPage())
             .pace(2)
             .exec(Catalog.Category.view())
@@ -74,6 +76,9 @@ public class GatlingDemoStoreSimulation extends Simulation {
 
         private static ChainBuilder browsStore() {
             return exec(initSession())
+                    .exec(CmsPages.homePage())
+                    .pace(2)
+                    .exec(Customer.loadLogin())
                     .exec(Customer.login())
                     .pause(MAX_PAUSE)
                     .exec(CmsPages.aboutUsPage())
@@ -87,6 +92,9 @@ public class GatlingDemoStoreSimulation extends Simulation {
 
         private static ChainBuilder abandonCart() {
             return exec(initSession())
+                    .exec(CmsPages.homePage())
+                    .pace(2)
+                    .exec(Customer.loadLogin())
                     .exec(Customer.login())
                     .pause(MAX_PAUSE)
                     .exec(Catalog.Category.view())
@@ -98,6 +106,9 @@ public class GatlingDemoStoreSimulation extends Simulation {
 
         private static ChainBuilder completePurchase() {
             return exec(initSession())
+                    .exec(CmsPages.homePage())
+                    .pace(2)
+                    .exec(Customer.loadLogin())
                     .exec(Customer.login())
                     .pause(MAX_PAUSE)
                     .exec(Catalog.Category.view())
